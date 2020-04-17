@@ -1,0 +1,17 @@
+.DS_Store
+.classpath
+.project
+.settings/
+bin/
+*.dot
+*.jpeg
+*.png
+*.ucls
+*~
+/.gradle/
+config.properties
+.idea/
+gradle/
+gradlew
+gradlew.bat
+

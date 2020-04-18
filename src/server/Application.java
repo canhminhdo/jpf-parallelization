@@ -1,5 +1,8 @@
 package server;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import jpf.TraceMessage;
 import server.factory.ServerFactory;
 import server.instances.RabbitMQ;
@@ -17,6 +20,7 @@ public class Application {
 	Redis redis = null;
 	RabbitMQ rabbitMQ = null;
 	TraceMessage traceMsg = null;
+	HashMap<Integer, HashMap<String, Integer>> seqSet = new HashMap<Integer, HashMap<String, Integer>>();
 
 	public Application(ServerFactory serverFactory) {
 		this.serverFactory = serverFactory;
@@ -60,5 +64,17 @@ public class Application {
 
 	public void setTraceMsg(TraceMessage traceMsg) {
 		this.traceMsg = traceMsg;
+	}
+	
+	public HashMap<Integer, HashMap<String, Integer>> getSeqSet() {
+		return this.seqSet;
+	}
+	
+	public void printSeqSet() {
+		for (Map.Entry mapElement : seqSet.entrySet()) { 
+			Integer depth = (Integer)mapElement.getKey(); 
+            HashMap<String, Integer> seqDepthSet = (HashMap<String,Integer>)mapElement.getValue();
+            System.out.println("Depth=" + depth + " #Seq=" + seqDepthSet.size());
+        } 
 	}
 }

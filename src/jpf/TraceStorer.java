@@ -17,6 +17,13 @@
  */
 package jpf;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.SerializationUtils;
+
 import config.AppConfig;
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
@@ -76,6 +83,15 @@ public class TraceStorer extends ListenerAdapter {
 	// application information
 	Application app;
 	
+	// sequence set
+	HashMap<Integer, HashMap<String, Integer>> seqSet;
+		
+	// sequence set in this depth
+	HashMap<String, Integer> seqDepthSet;
+	
+	// number of time hit to the cache
+	int hitCached = 0;
+	
 	public TraceStorer() {}
 	
 	public TraceStorer(Config config, JPF jpf) {
@@ -98,6 +114,12 @@ public class TraceStorer extends ListenerAdapter {
 		
 		// calculate next depth for JPF
 		storeDepth = calculateNextDepth(app.getTraceMsg().getLength(), storeDepth, appConfig.getBmcDepth());
+		
+		seqSet = app.getSeqSet();
+		if (!seqSet.containsKey(storeDepth)) {
+			seqSet.put(storeDepth, new HashMap<String, Integer>());
+		}
+		seqDepthSet = seqSet.get(storeDepth);
 	}
 	
 	int calculateNextDepth(int currentDepth, int storeDepth, int bmcDepth) {
@@ -129,8 +151,17 @@ public class TraceStorer extends ListenerAdapter {
 	}
 	
 	public void submitJob(ExChoicePoint trace) {
-		TraceMessage traceMsg = new TraceMessage(trace);
-		mq.Sender.getInstance().sendJob(traceMsg);
+		// check existing in big cached
+		String sha256Hex = DigestUtils.sha256Hex(SerializationUtils.serialize(trace));
+		if (seqDepthSet.containsKey(sha256Hex)) {
+			seqDepthSet.replace(sha256Hex, seqDepthSet.get(sha256Hex) + 1);
+			hitCached ++;
+			System.out.println("Hit to the cache " + hitCached);
+		} else {
+			seqDepthSet.put(sha256Hex, 0);
+			TraceMessage traceMsg = new TraceMessage(trace);
+			mq.Sender.getInstance().sendJob(traceMsg);
+		}
 	}
 
 	@Override
@@ -179,5 +210,11 @@ public class TraceStorer extends ListenerAdapter {
 		}
 
 		return false;
+	}
+
+	@Override
+	public void searchFinished(Search search) {
+		app.printSeqSet();
+		System.out.println("Depth is " + storeDepth + ", number of hit to the cache = " + hitCached);
 	}
 }

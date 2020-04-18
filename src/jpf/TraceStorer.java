@@ -113,11 +113,13 @@ public class TraceStorer extends ListenerAdapter {
 		// calculate next depth for JPF
 		storeDepth = calculateNextDepth(app.getTraceMsg().getLength(), storeDepth, appConfig.getBmcDepth());
 		
-		seqSet = app.getSeqSet();
-		if (!seqSet.containsKey(storeDepth)) {
-			seqSet.put(storeDepth, new HashMap<String, Integer>());
+		if (appConfig.isCaching()) {
+			seqSet = app.getSeqSet();
+			if (!seqSet.containsKey(storeDepth)) {
+				seqSet.put(storeDepth, new HashMap<String, Integer>());
+			}
+			seqDepthSet = seqSet.get(storeDepth);
 		}
-		seqDepthSet = seqSet.get(storeDepth);
 	}
 	
 	int calculateNextDepth(int currentDepth, int storeDepth, int bmcDepth) {
@@ -148,15 +150,23 @@ public class TraceStorer extends ListenerAdapter {
 		checkSearchTermination();
 	}
 	
-	public void submitJob(ExChoicePoint trace) {
-		// check existing in big cached
-		String sha256Hex = DigestUtils.sha256Hex(SerializationUtils.serialize(trace));
-		if (seqDepthSet.containsKey(sha256Hex)) {
-			seqDepthSet.replace(sha256Hex, seqDepthSet.get(sha256Hex) + 1);
-			hitCached ++;
-			System.out.println("Hit to the cache " + hitCached);
-		} else {
+	public boolean isSubmitable(ExChoicePoint trace) {
+		if (appConfig.isCaching()) {
+			// check existing in big cached
+			String sha256Hex = DigestUtils.sha256Hex(SerializationUtils.serialize(trace));
+			if (seqDepthSet.containsKey(sha256Hex)) {
+				seqDepthSet.replace(sha256Hex, seqDepthSet.get(sha256Hex) + 1);
+				hitCached ++;
+				System.out.println("Hit to the cache " + hitCached);
+				return false;
+			}
 			seqDepthSet.put(sha256Hex, 0);
+		}
+		return true;
+	}
+	
+	public void submitJob(ExChoicePoint trace) {
+		if (isSubmitable(trace)) {
 			TraceMessage traceMsg = new TraceMessage(trace);
 			mq.Sender.getInstance().sendJob(traceMsg);
 		}
@@ -212,7 +222,9 @@ public class TraceStorer extends ListenerAdapter {
 
 	@Override
 	public void searchFinished(Search search) {
-		app.printSeqSet();
-		System.out.println("Depth is " + storeDepth + ", number of hit to the cache = " + hitCached);
+		if (appConfig.isCaching()) {
+			app.printSeqSet();
+			System.out.println("Depth is " + storeDepth + ", number of hit to the cache = " + hitCached);
+		}
 	}
 }

@@ -42,8 +42,9 @@ public class AppConfigTest {
 		
 		String projectDir = "/Users/ogataslab/eclipse-workspace/jpf-parallelization";
 		int reachDepth = 100;
-		int reachBound = 1000;
+		int reachBound = Integer.MAX_VALUE;
 		int bmcDepth = 400;
+		boolean isCaching = false;
 		boolean isRemote = false;
 		
 		// RABBITMQ
@@ -73,6 +74,7 @@ public class AppConfigTest {
 		assertEquals("reachDepth is not same", reachDepth, config.getReachDepth());
 		assertEquals("reachBound is not same", reachBound, config.getReachBound());
 		assertEquals("bmcDepth is not same", bmcDepth, config.getBmcDepth());
+		assertEquals("isCaching is not same", isCaching, config.isCaching());
 		
 		assertEquals("isRemote is not same", isRemote, config.isRemote());
 		

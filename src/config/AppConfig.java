@@ -32,9 +32,10 @@ public class AppConfig {
 	
 	// maximum depth if running BMC 
 	private int bmcDepth;
+	private boolean isCaching;
 
 	// running in remote mode
-	private Boolean isRemote;
+	private boolean isRemote;
 
 	// RABBITMQ
 	private boolean isUsingRabbitMQ;
@@ -110,6 +111,7 @@ public class AppConfig {
 		reachBound = Integer.parseInt(appProps.getProperty("trace.bound", String.valueOf(Integer.MAX_VALUE)));
 		// Bounded Model Checking configuration
 		bmcDepth = Integer.parseInt(appProps.getProperty("jpf.bmc.depth", String.valueOf(Integer.MAX_VALUE)));
+		isCaching = Boolean.valueOf(appProps.getProperty("jpf.caching", "false"));
 		isRemote = Boolean.valueOf(appProps.getProperty("env.isRemote", "false"));
 		
 		// RABBITMQ
@@ -163,9 +165,13 @@ public class AppConfig {
 	public int getBmcDepth() {
 		return bmcDepth;
 	}
-
-	public Boolean isRemote() {
+	
+	public boolean isRemote() {
 		return isRemote;
+	}
+	
+	public boolean isCaching() {
+		return isCaching;
 	}
 
 	public boolean isUsingRabbitMQ() {

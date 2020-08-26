@@ -17,17 +17,17 @@
  */
 package jpf;
 
-import java.util.HashMap;
-
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.lang3.SerializationUtils;
+import java.util.HashSet;
+import java.util.Set;
 
 import config.AppConfig;
+import database.RedisClient;
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
 import gov.nasa.jpf.search.Search;
-import gov.nasa.jpf.util.StringSetMatcher;
+import gov.nasa.jpf.util.HashData;
+import gov.nasa.jpf.vm.ElementInfo;
 import gov.nasa.jpf.vm.VM;
 import redis.clients.jedis.Jedis;
 import server.Application;
@@ -47,28 +47,22 @@ public class TraceStorer extends ListenerAdapter {
 	// do we store to the same file? (i.e. overwrite previously stored traces)
 	// if set to 'true', store all traces (in <traceFileName>.n)
 	boolean storeMultiple;
-
-	// do we want to terminate after first store, even if it's triggered by a
-	// property violation?
-	boolean terminateOnStore;
-
-	boolean storeOnConstraintHit;
-
+	
 	// search depth at what we store the trace
 	int storeDepth;
 
 	// search depth at what we store the trace
 	int storeBound;
-
-	// calls that should trigger a store
-	StringSetMatcher storeCalls;
-
-	// thread starts that should trigger a store
-	StringSetMatcher storeThreads;
-
+	
 	// do we want verbose output
 	boolean verbose;
+	
+	// do we want to terminate after first store, even if it's triggered by a
+	// property violation?
+	boolean terminateOnStore;
 
+	boolean storeOnConstraintHit;
+	
 	Search search;
 	VM vm;
 	
@@ -81,15 +75,13 @@ public class TraceStorer extends ListenerAdapter {
 	// application information
 	Application app;
 	
-	// sequence set
-	HashMap<Integer, HashMap<String, Integer>> seqSet;
-		
-	// sequence set in this depth
-	HashMap<String, Integer> seqDepthSet;
+	// heap map
+	Set<Integer> heapSet = new HashSet<Integer>();
 	
-	// number of time hit to the cache
+	// count number of hit cached
 	int hitCached = 0;
-	
+	int hitCachedRedis = 0;
+		
 	public TraceStorer() {}
 	
 	public TraceStorer(Config config, JPF jpf) {
@@ -113,13 +105,8 @@ public class TraceStorer extends ListenerAdapter {
 		// calculate next depth for JPF
 		storeDepth = calculateNextDepth(app.getTraceMsg().getLength(), storeDepth, appConfig.getBmcDepth());
 		
-		if (appConfig.isCaching()) {
-			seqSet = app.getSeqSet();
-			if (!seqSet.containsKey(storeDepth)) {
-				seqSet.put(storeDepth, new HashMap<String, Integer>());
-			}
-			seqDepthSet = seqSet.get(storeDepth);
-		}
+		// initialize jedis
+		jedis = RedisClient.getInstance(app.getRedis().getHost(), app.getRedis().getPort()).getConnection();
 	}
 	
 	int calculateNextDepth(int currentDepth, int storeDepth, int bmcDepth) {
@@ -150,23 +137,8 @@ public class TraceStorer extends ListenerAdapter {
 		checkSearchTermination();
 	}
 	
-	public boolean isSubmitable(ExChoicePoint trace) {
-		if (appConfig.isCaching()) {
-			// check existing in big cached
-			String sha256Hex = DigestUtils.sha256Hex(SerializationUtils.serialize(trace));
-			if (seqDepthSet.containsKey(sha256Hex)) {
-				seqDepthSet.replace(sha256Hex, seqDepthSet.get(sha256Hex) + 1);
-				hitCached ++;
-				System.out.println("Hit to the cache " + hitCached);
-				return false;
-			}
-			seqDepthSet.put(sha256Hex, 0);
-		}
-		return true;
-	}
-	
 	public void submitJob(ExChoicePoint trace) {
-		if (isSubmitable(trace)) {
+		if (checkingHeap()) {
 			TraceMessage traceMsg = new TraceMessage(trace);
 			mq.Sender.getInstance().sendJob(traceMsg);
 		}
@@ -179,6 +151,9 @@ public class TraceStorer extends ListenerAdapter {
 		boolean is_new = search.isNewState();
 		boolean is_end = search.isEndState();
 		int depth = search.getDepth();
+		
+		search.getVM().getHeap();
+		
 		
 		if (id < 0)
 			return;
@@ -197,10 +172,37 @@ public class TraceStorer extends ListenerAdapter {
 			search.requestBacktrack();
 		}
 		
-		
 		if (nTrace >= storeBound) {
 			search.terminate();
 		}
+	}
+	
+	public boolean checkingHeap() {
+		HashData hd = new HashData();
+		for (ElementInfo ei : vm.getHeap().liveObjects()) {
+//			hd.add(ei.getObjectRef());
+//			hd.add(ei.hashCode());
+			
+			// only concern about fields data
+			HashData ei_hd = new HashData();
+			ei.getFields().hash(ei_hd);
+			hd.add(ei.getObjectRef());
+			hd.add(ei_hd.getValue());
+		}
+		
+		if (heapSet.contains(hd.getValue())) {
+			hitCached ++;
+		} else {
+			heapSet.add(hd.getValue());
+			if (jedis.sismember("STATES", String.valueOf(hd.getValue()))) {
+				hitCachedRedis ++;
+				System.out.println("In Redis Cache");
+			} else {
+				jedis.sadd("STATES", String.valueOf(hd.getValue()));
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -222,9 +224,7 @@ public class TraceStorer extends ListenerAdapter {
 
 	@Override
 	public void searchFinished(Search search) {
-		if (appConfig.isCaching()) {
-			app.printSeqSet();
-			System.out.println("Depth is " + storeDepth + ", number of hit to the cache = " + hitCached);
-		}
+		System.out.println("Number of hit cached " + hitCached);
+		System.out.println("Number of hit cached in Redis " + hitCachedRedis);
 	}
 }

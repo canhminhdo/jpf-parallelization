@@ -7,6 +7,7 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 import config.AppConfig;
+import database.RedisClient;
 import jpf.TraceMessage;
 import server.Application;
 import server.ApplicationConfigurator;
@@ -73,7 +74,7 @@ public class Starter {
 			}
 
 			// Flush all keys and values from Redis server
-//			RedisClient.getInstance(app.getRedis().getHost(), app.getRedis().getPort()).getConnection().flushAll();
+			RedisClient.getInstance(app.getRedis().getHost(), app.getRedis().getPort()).getConnection().flushAll();
 		} catch (Exception e) {
 			System.out.println("Cannot clean up");
 			e.printStackTrace();

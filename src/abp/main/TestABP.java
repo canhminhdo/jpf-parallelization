@@ -13,7 +13,7 @@ public class TestABP {
         */
         // String packets[] = { "Simula 67", "Smalltalk-80", "Java" };
         // String packets[] = { "Simula 67", "Smalltalk-80" };
-        String packets[] = { "Simula 67" };
+        String packets[] = { "0" };
         List<String> list1 = Arrays.asList(packets);
         List<String> list2 = new ArrayList<String>();
         ABP<String> abp = new ABP<String>();
@@ -24,5 +24,6 @@ public class TestABP {
         System.out.println("Packets rec: " + list2);
         */
         assert list1.equals(list2);
+        System.out.println("Finished");
     }
 }

@@ -13,7 +13,6 @@ import config.AppConfig;
 import jpf.TraceMessage;
 import server.Application;
 import server.ApplicationConfigurator;
-import utils.DateUtil;
 
 /**
  * Receiver program as RabbitMQ client Whenever receiving a message from
@@ -24,8 +23,6 @@ import utils.DateUtil;
  */
 public class Receiver {
 
-	public static HashMap<Integer,Integer> analyzer;
-	
 	/**
 	 * Starting a RabbitMQ client.
 	 * 
@@ -52,9 +49,6 @@ public class Receiver {
 		channel.queueDeclare(app.getRabbitMQ().getQueueName(), false, false, false, null);
 		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
 		
-		// HashTable to analyze the number of state at each depth
-		analyzer = new HashMap<Integer,Integer>();
-		
 		DeliverCallback deliverCallback = (consumerTag, delivery) -> {
 			
 			TraceMessage traceMsg = SerializationUtils.deserialize(delivery.getBody());
@@ -63,11 +57,9 @@ public class Receiver {
 			assert traceMsg.getAppName() == AppConfig.getInstance().getAppName() : "Not message from our experiment";
 			
 			System.out.println(traceMsg);
-			System.out.println("JPF started at " + DateUtil.getDateTimeString());
+			System.out.println("Depth " + length);
 			System.out.println(" [x] Received '" + traceMsg);
 			
-			analyzer(length);
-
 			if (length >= AppConfig.getInstance().getBmcDepth()) {
 				// Reach to maximum depth. Do not check anymore
 				channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
@@ -78,11 +70,8 @@ public class Receiver {
 				RunJPF runner = new RunJPF(traceMsg);
 				runner.start();
 				runner.join();
-				System.out.println("JPF finished at " + DateUtil.getDateTimeString());
 				channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-				System.out.println("Sending ack");
 			} catch (InterruptedException e) {
-				System.out.println("waiting jpf and ack to rabbitmq " + e.getMessage());
 				e.printStackTrace();
 			}
 		};
@@ -92,18 +81,5 @@ public class Receiver {
 			System.out.println("Receiver consumer cancelling " + consumerTag);
 		});
 	}
-	
-	public static void analyzer(int length) {
-		if (analyzer.containsKey(length)) {
-			analyzer.put(length, analyzer.get(length) + 1);
-		} else {
-			analyzer.put(length, 1);
-		}
-		
-		System.out.println("--> Start Counter");
-		for (int key: analyzer.keySet()) {
-			System.out.println("Depth " + key + " = " + analyzer.get(key));
-		}
-		System.out.println("--> End Counter");
-	}
+
 }

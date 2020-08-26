@@ -69,7 +69,7 @@ public class Sender {
 	public void sendJob(TraceMessage traceMsg) {
 		try {
 			channel.basicPublish("", this.rabbitMQ.getQueueName(), null, SerializationUtils.serialize(traceMsg));
-			System.out.println(" [x] Sent '" + traceMsg);
+//			System.out.println(" [x] Sent '" + traceMsg);
 		} catch (Exception e) {
 			System.out.println("Cannot send message on queue " + this.rabbitMQ.getQueueName());
 			e.printStackTrace();
